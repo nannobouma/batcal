@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thuisbatterij ROI Calculator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+<header>
+  <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+    <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+  </svg>
+  <div>
+    <h1>Thuisbatterij ROI Calculator</h1>
+    <span>Bereken het rendement van uw energieopslag op basis van slimme-meterdata</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ══ STAP 1: DATA LADEN ═══════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+      </svg>
+      Stap 1 — Kwartierdata laden
+    </div>
+
+    <div id="drop-zone">
+      <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      </svg>
+      <p><strong>Klik hier of sleep uw CSV-bestand</strong></p>
+      <p style="margin-top:4px">Ondersteunt exports van Liander, Enexis, DSMR-reader en andere slimme-meterformaten</p>
+    </div>
+    <input type="file" id="file-input" accept=".csv,.txt">
+
+    <div id="file-info" class="file-info"></div>
+    <div id="alert-parse" class="alert"></div>
+  </div>
+
+  <!-- ══ STAP 2: PARAMETERS ═══════════════════════════════════════════════ -->
+  <div class="card section-gap">
+    <div class="card-title">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+      </svg>
+      Stap 2 — Parameters instellen
+    </div>
+
+    <div class="param-grid">
+      <div class="param-group">
+        <label for="p-capacity">Batterijcapaciteit (netto)</label>
+        <input type="number" id="p-capacity" value="5" min="0.5" max="50" step="0.5">
+        <div class="param-unit">kWh</div>
+      </div>
+      <div class="param-group">
+        <label for="p-investment">Investering</label>
+        <input type="number" id="p-investment" value="2000" min="100" max="50000" step="100">
+        <div class="param-unit">euro (incl. installatie)</div>
+      </div>
+      <div class="param-group">
+        <label for="p-efficiency">Roundtrip efficiëntie</label>
+        <input type="number" id="p-efficiency" value="85" min="50" max="99" step="1">
+        <div class="param-unit">% (typisch 80–95%)</div>
+      </div>
+      <div class="param-group">
+        <label for="p-price">Elektriciteitsprijs</label>
+        <input type="number" id="p-price" value="0.25" min="0" max="2" step="0.01">
+        <div class="param-unit">€/kWh (gebruikt bij vast tarief)</div>
+      </div>
+      <div class="param-group">
+        <label for="p-feedin">Terugleverprijs</label>
+        <input type="number" id="p-feedin" value="0.00" min="0" max="1" step="0.01">
+        <div class="param-unit">€/kWh (0 = saldering afgebouwd)</div>
+      </div>
+      <div class="param-group">
+        <label for="p-lifetime">Levensduur (voor ROI)</label>
+        <input type="number" id="p-lifetime" value="10" min="1" max="25" step="1">
+        <div class="param-unit">jaar</div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="param-group" style="max-width:360px">
+      <label>Tarief type</label>
+      <div class="mode-toggle">
+        <button id="btn-fixed" class="active">Vast tarief</button>
+        <button id="btn-dynamic">Dynamisch tarief</button>
+      </div>
+    </div>
+
+    <div id="dynamic-note" style="display:none; margin-top:16px">
+      <div class="tariff-note" style="max-width:680px; margin-bottom:12px">
+        <strong>Dynamisch tarief</strong>: historische EPEX SPOT kwartierdata via energyzero.nl.
+        De batterij laadt uit het net <em>alleen</em> als het prijsverschil groter is dan de opslagkosten
+        plus roundtrip-verlies. Ontladen gebeurt bij voorkeur tijdens de duurste kwartieren van de dag.
+        Zonne-surplus wordt altijd opgeslagen (geen netkosten).
+      </div>
+      <div class="param-grid" style="max-width:440px">
+        <div class="param-group">
+          <label for="p-storage-cost">Opslagkosten (dynamisch tarief)</label>
+          <input type="number" id="p-storage-cost" value="0.12" min="0" max="0.50" step="0.01">
+          <div class="param-unit">€/kWh — netkosten + leveranciersmarge bij laden uit net</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px; display:flex; align-items:center; gap:12px">
+      <button id="btn-calc" class="btn btn-primary" disabled>
+        <span class="btn-text">Bereken rendement</span>
+        <div id="calc-spinner" class="spinner"></div>
+      </button>
+    </div>
+    <div id="alert-calc" class="alert" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ══ RESULTATEN ════════════════════════════════════════════════════════ -->
+  <div id="results-section" class="hidden section-gap">
+
+    <!-- KPI Kaarten -->
+    <div class="grid-5">
+      <div class="kpi-card">
+        <div class="kpi-label">Jaarlijkse besparing</div>
+        <div id="kpi-annual" class="kpi-value green">—</div>
+        <div class="kpi-sub">per jaar (geschat)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Terugverdientijd</div>
+        <div id="kpi-payback" class="kpi-value blue">—</div>
+        <div class="kpi-sub">jaren</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">ROI over looptijd</div>
+        <div id="kpi-roi" class="kpi-value">—</div>
+        <div class="kpi-sub">netto rendement</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Zelfvoorzieningsgraad</div>
+        <div id="kpi-self" class="kpi-value">—</div>
+        <div class="kpi-sub">% verbruik uit batterij</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Batterijbenutting</div>
+        <div id="kpi-util" class="kpi-value">—</div>
+        <div class="kpi-sub">gem. dagelijkse doorstroom</div>
+      </div>
+    </div>
+    <div id="kpi-note" style="font-size:.8rem; color:var(--text-3); margin-top:8px; text-align:right"></div>
+
+    <!-- Kostenvergelijking -->
+    <div id="comparison-section" class="card section-gap hidden">
+      <div class="card-title">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Kostenvergelijking vast vs. dynamisch tarief
+      </div>
+      <table id="cost-table" style="width:100%; border-collapse:collapse; font-size:.9rem">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border); text-align:left">
+            <th style="padding:10px 12px; color:var(--text-2)"></th>
+            <th style="padding:10px 12px; color:var(--text-2)">Vast tarief</th>
+            <th style="padding:10px 12px; color:var(--text-2)">Dynamisch tarief</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px; font-weight:500">Jaarkosten zonder batterij</td>
+            <td id="ct-fixed-without" style="padding:10px 12px">—</td>
+            <td id="ct-dyn-without" style="padding:10px 12px">—</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px; font-weight:500">Jaarkosten met batterij</td>
+            <td id="ct-fixed-with" style="padding:10px 12px">—</td>
+            <td id="ct-dyn-with" style="padding:10px 12px">—</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border); background:var(--accent-light)">
+            <td style="padding:10px 12px; font-weight:600">Jaarlijkse besparing</td>
+            <td id="ct-fixed-saving" style="padding:10px 12px; font-weight:600; color:var(--accent)">—</td>
+            <td id="ct-dyn-saving" style="padding:10px 12px; font-weight:600; color:var(--accent)">—</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px; font-weight:500">Terugverdientijd</td>
+            <td id="ct-fixed-payback" style="padding:10px 12px">—</td>
+            <td id="ct-dyn-payback" style="padding:10px 12px">—</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px; font-weight:500">ROI over looptijd</td>
+            <td id="ct-fixed-roi" style="padding:10px 12px">—</td>
+            <td id="ct-dyn-roi" style="padding:10px 12px">—</td>
+          </tr>
+        </tbody>
+      </table>
+      <div id="ct-note" class="tariff-note" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Grafieken -->
+    <div class="card section-gap">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-monthly">Maandelijkse besparing</button>
+        <button class="tab-btn" data-tab="tab-payback">Terugverdientijd</button>
+        <button class="tab-btn" data-tab="tab-soc">Batterij SOC</button>
+        <button class="tab-btn" data-tab="tab-profile">Dagprofiel</button>
+        <button class="tab-btn" data-tab="tab-flow">Energiestroom</button>
+      </div>
+
+      <!-- Tab: Maandelijkse besparing -->
+      <div id="tab-monthly" class="tab-panel active">
+        <div class="card-title">Besparing per maand (€)</div>
+        <div class="chart-wrap">
+          <canvas id="chart-monthly"></canvas>
+        </div>
+      </div>
+
+      <!-- Tab: Terugverdientijd -->
+      <div id="tab-payback" class="tab-panel">
+        <div class="card-title">Cumulatieve besparing vs. investering</div>
+        <div class="chart-wrap-tall">
+          <canvas id="chart-payback"></canvas>
+        </div>
+      </div>
+
+      <!-- Tab: SOC verloop -->
+      <div id="tab-soc" class="tab-panel">
+        <div class="week-nav">
+          <button id="btn-prev-week">&#8249;</button>
+          <span id="week-label">—</span>
+          <button id="btn-next-week">&#8250;</button>
+          <span style="color:var(--text-3)">Gebruik ‹ › om een andere week te kiezen</span>
+        </div>
+        <div class="card-title">Batterij laadtoestand (SOC) — geselecteerde week</div>
+        <div class="chart-wrap-tall">
+          <canvas id="chart-soc"></canvas>
+        </div>
+      </div>
+
+      <!-- Tab: Dagprofiel -->
+      <div id="tab-profile" class="tab-panel">
+        <div class="card-title">Gemiddeld netverbruik per uur van de dag (met batterij)</div>
+        <div class="chart-wrap">
+          <canvas id="chart-profile"></canvas>
+        </div>
+      </div>
+
+      <!-- Tab: Energiestroom -->
+      <div id="tab-flow" class="tab-panel">
+        <div class="card-title">Herkomst elektriciteitsverbruik (met batterij)</div>
+        <div style="display:flex; justify-content:center">
+          <div style="width:280px; height:280px; position:relative">
+            <canvas id="chart-flow"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /results-section -->
+
+</div><!-- /container -->
+
+<!-- Scripts laden in volgorde: utilities eerst, app.js als laatste -->
+<script src="js/csv-parser.js?v=8"></script>
+<script src="js/battery-sim.js?v=8"></script>
+<script src="js/pricing.js?v=8"></script>
+<script src="js/charts.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
+
+</body>
+</html>
