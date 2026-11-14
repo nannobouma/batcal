@@ -171,6 +171,7 @@ async function runCalculation() {
     _weekOffset = 0;
     renderResults(_simResult);
     renderComparison(fixedResult, dynResult, params);
+    renderEnergyBalance(fixedResult);
     $('results-section').classList.remove('hidden');
     $('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -266,6 +267,57 @@ function renderComparison(fixedResult, dynResult, params) {
     `<strong>Dynamisch tarief:</strong> EPEX SPOT day-ahead + €${storageCost.toFixed(2)}/kWh opslagkosten (netkosten + leveranciersmarge).`;
 
   section.classList.remove('hidden');
+}
+
+// ── Energiebalans zonnestroom (kWh) ───────────────────────────────────────────
+// Altijd op basis van de strategie "zon-overschot opslaan" (vast tarief), zodat
+// netladen bij dynamisch tarief de zelfverbruikscijfers niet vertekent.
+function renderEnergyBalance(fixedResult) {
+  const t = fixedResult.totals;
+  const solarRaw = parseFloat($('p-solar').value);
+  const hasSolar = Number.isFinite(solarRaw) && solarRaw > 0;
+  const solar    = hasSolar ? solarRaw : null;
+
+  const viaBattery = t.totalDischarged;
+  // Wat de batterij in ging (minder teruglevering) min wat er uit kwam en wat er nog in zit
+  const losses = Math.max(0, (t.returnedRef - t.returnedBat) - t.totalDischarged - t.finalSoc);
+
+  const kwh  = v => `${Math.round(v).toLocaleString('nl-NL')} kWh`;
+  const pctOf = v => hasSolar ? ` <span class="pct">(${(v / solar * 100).toFixed(0)}%)</span>` : '';
+  const cell = v => v === null ? '—' : kwh(v) + pctOf(v);
+  const diff = (a, b) => {
+    if (a === null || b === null) return '—';
+    const d = b - a;
+    return `${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(Math.round(d)).toLocaleString('nl-NL')} kWh`;
+  };
+  const row = (label, a, b, cls = '') =>
+    `<tr class="${cls}"><td>${label}</td><td>${cell(a)}</td><td>${cell(b)}</td><td>${diff(a, b)}</td></tr>`;
+
+  const direct = hasSolar ? solar - t.returnedRef : null;
+  const rows = [
+    row('Opwek zonnepanelen', solar, solar),
+    row('Direct zelf verbruikt', direct, direct),
+    row('Zelf verbruikt via batterij', 0, viaBattery),
+    row('Totaal zelfverbruik', direct, hasSolar ? direct + viaBattery : null, 'total-row'),
+    row('Teruglevering aan het net', t.returnedRef, t.returnedBat),
+    row('Omzetverlies in de batterij', 0, losses),
+  ];
+  // Netafname is geen deel van de opwek: zonder percentage
+  const plain = v => kwh(v);
+  rows.push(`<tr><td>Afname uit het net</td><td>${plain(t.deliveredRef)}</td><td>${plain(t.deliveredBat)}</td><td>${diff(t.deliveredRef, t.deliveredBat)}</td></tr>`);
+  $('eb-table-body').innerHTML = rows.join('');
+
+  let note = `Over de periode van de data (${Math.round(t.daysCovered)} dagen), niet geëxtrapoleerd. ` +
+    `Berekend met de strategie "zon-overschot opslaan" (zonder laden uit het net).`;
+  if (t.finalSoc > 0.05) note += ` Aan het eind zit nog ${t.finalSoc.toFixed(1)} kWh in de batterij.`;
+  if (!hasSolar) {
+    note += ` Vul bij stap 2 de opbrengst van de zonnepanelen in om het zelfverbruik ook in kWh en als percentage van de opwek te zien.`;
+  } else if (solar < t.returnedRef) {
+    note += ` <strong>Let op:</strong> de opgegeven opwek (${kwh(solar)}) is lager dan de gemeten teruglevering (${kwh(t.returnedRef)}); controleer de waarde.`;
+  } else {
+    note += ` Percentages zijn ten opzichte van de opgegeven opwek.`;
+  }
+  $('eb-note').innerHTML = note;
 }
 
 function renderSOCChart() {

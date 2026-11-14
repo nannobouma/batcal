@@ -335,6 +335,7 @@ header span { opacity: .7; font-size: .875rem; }
 }
 .data-table th:first-child, .data-table td:first-child { text-align: left; font-weight: 500; }
 .data-table tr.total-row td { font-weight: 600; background: var(--accent-light); border-bottom: none; }
+.data-table .pct { color: var(--text-3); font-weight: 400; }
 .data-table td.over-target { color: var(--danger); }
 .data-table td.under-target { color: var(--accent); }
 

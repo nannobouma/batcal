@@ -85,6 +85,11 @@
         <input type="number" id="p-lifetime" value="10" min="1" max="25" step="1">
         <div class="param-unit">jaar</div>
       </div>
+      <div class="param-group">
+        <label for="p-solar">Opbrengst zonnepanelen (optioneel)</label>
+        <input type="number" id="p-solar" value="" min="0" max="100000" step="10" placeholder="bijv. 3500">
+        <div class="param-unit">kWh in de periode van de data — voor zelfverbruik in % van de opwek</div>
+      </div>
     </div>
 
     <hr class="divider">
@@ -341,6 +346,25 @@
       <div id="ct-note" class="tariff-note" style="margin-top:12px"></div>
     </div>
 
+    <!-- Energiebalans zonnestroom -->
+    <div class="card section-gap">
+      <div class="card-title">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>
+        </svg>
+        Zelfverbruik zonnestroom (kWh)
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr><th></th><th>Zonder batterij</th><th>Met batterij</th><th>Verschil</th></tr>
+          </thead>
+          <tbody id="eb-table-body"></tbody>
+        </table>
+      </div>
+      <div id="eb-note" class="tariff-note" style="margin-top:12px"></div>
+    </div>
+
     <!-- Grafieken -->
     <div class="card section-gap">
       <div class="tabs">
@@ -405,12 +429,12 @@
 </div><!-- /container -->
 
 <!-- Scripts laden in volgorde: utilities eerst, app.js als laatste -->
-<script src="js/csv-parser.js?v=9"></script>
-<script src="js/battery-sim.js?v=9"></script>
-<script src="js/peak-sim.js?v=9"></script>
-<script src="js/pricing.js?v=9"></script>
-<script src="js/charts.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/csv-parser.js?v=10"></script>
+<script src="js/battery-sim.js?v=10"></script>
+<script src="js/peak-sim.js?v=10"></script>
+<script src="js/pricing.js?v=10"></script>
+<script src="js/charts.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 
 </body>
 </html>

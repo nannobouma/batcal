@@ -173,6 +173,11 @@ function simulateBattery(data, params, priceMap = null) {
       costWithout: totalCostRef,
       costWith: totalCostBat,
       annualizeFactor,
+      finalSoc: soc,
+      deliveredRef: totalDeliveredRef,
+      deliveredBat: monthlyArr.reduce((s, m) => s + m.deliveredBat, 0),
+      returnedRef:  monthlyArr.reduce((s, m) => s + m.returnedRef, 0),
+      returnedBat:  monthlyArr.reduce((s, m) => s + m.returnedBat, 0),
     },
     params,
   };
