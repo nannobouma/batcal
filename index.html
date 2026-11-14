@@ -57,7 +57,7 @@
     <div class="param-grid">
       <div class="param-group">
         <label for="p-capacity">Batterijcapaciteit (netto)</label>
-        <input type="number" id="p-capacity" value="5" min="0.5" max="50" step="0.5">
+        <input type="number" id="p-capacity" value="5" min="0" max="50" step="0.5">
         <div class="param-unit">kWh</div>
       </div>
       <div class="param-group">
@@ -120,6 +120,145 @@
       </button>
     </div>
     <div id="alert-calc" class="alert" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ══ PIEKVERLAGING ═════════════════════════════════════════════════════ -->
+  <div class="card section-gap">
+    <div class="card-title">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M3 17l6-6 4 4 8-8M14 7h7v7"/>
+      </svg>
+      Piekverlaging — Vermijd de piek (november t/m februari)
+    </div>
+
+    <div class="tariff-note" style="max-width:760px; margin:0 0 16px">
+      Hoe ver kan de batterij uw netafname in de avondpiek terugbrengen? De batterij laadt buiten de piek
+      (zon-overschot eerst, de rest 's nachts uit het net) en ontlaadt in het piekvenster zo dat de resterende
+      afname zo laag en vlak mogelijk is. Gebruikt de batterijcapaciteit en efficiëntie uit stap 2;
+      vul <strong>0 kWh</strong> in om de situatie zonder batterij te zien.
+    </div>
+
+    <div class="param-grid">
+      <div class="param-group">
+        <label for="pk-power">Max. (ont)laadvermogen</label>
+        <input type="number" id="pk-power" value="3" min="0" max="25" step="0.5">
+        <div class="param-unit">kW</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-start">Piekvenster van</label>
+        <input type="number" id="pk-start" value="16" min="0" max="23" step="1">
+        <div class="param-unit">uur</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-end">Piekvenster tot</label>
+        <input type="number" id="pk-end" value="21" min="1" max="24" step="1">
+        <div class="param-unit">uur</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-target">Streefwaarde piekaandeel</label>
+        <input type="number" id="pk-target" value="36" min="0" max="100" step="1">
+        <div class="param-unit">% van het dagverbruik</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-ch-start">Nachtladen van</label>
+        <input type="number" id="pk-ch-start" value="0" min="0" max="23" step="1">
+        <div class="param-unit">uur</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-ch-end">Nachtladen tot</label>
+        <input type="number" id="pk-ch-end" value="6" min="1" max="24" step="1">
+        <div class="param-unit">uur (vóór het piekvenster)</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <button id="btn-peak" class="btn btn-primary" disabled>Bereken piekverlaging</button>
+    </div>
+    <div id="alert-peak" class="alert" style="margin-top:12px"></div>
+  </div>
+
+  <div id="peak-results" class="hidden section-gap">
+    <div class="grid-5">
+      <div class="kpi-card">
+        <div class="kpi-label">Piekaandeel</div>
+        <div id="pk-kpi-share" class="kpi-value">—</div>
+        <div id="pk-kpi-share-sub" class="kpi-sub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Afname in de piek</div>
+        <div id="pk-kpi-kwh" class="kpi-value">—</div>
+        <div id="pk-kpi-kwh-sub" class="kpi-sub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Hoogste piekvermogen</div>
+        <div id="pk-kpi-kw" class="kpi-value">—</div>
+        <div id="pk-kpi-kw-sub" class="kpi-sub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Dagen onder streefwaarde</div>
+        <div id="pk-kpi-target" class="kpi-value">—</div>
+        <div id="pk-kpi-target-sub" class="kpi-sub">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Dagen zonder piekafname</div>
+        <div id="pk-kpi-zero" class="kpi-value">—</div>
+        <div id="pk-kpi-zero-sub" class="kpi-sub">—</div>
+      </div>
+    </div>
+    <div id="pk-note" style="font-size:.8rem; color:var(--text-3); margin-top:8px; text-align:right"></div>
+
+    <div class="card section-gap">
+      <div class="card-title">Piekaandeel per maand</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Maand</th>
+              <th>Dagen</th>
+              <th>Piek zonder (kWh)</th>
+              <th>Piek met (kWh)</th>
+              <th>Dagtotaal zonder (kWh)</th>
+              <th>Dagtotaal met (kWh)</th>
+              <th>Aandeel zonder</th>
+              <th>Aandeel met</th>
+            </tr>
+          </thead>
+          <tbody id="pk-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card section-gap">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="pk-tab-monthly">Per maand</button>
+        <button class="tab-btn" data-tab="pk-tab-daily">Per dag</button>
+        <button class="tab-btn" data-tab="pk-tab-profile">Dagprofiel</button>
+        <button class="tab-btn" data-tab="pk-tab-capacity">Batterijgrootte</button>
+      </div>
+
+      <div id="pk-tab-monthly" class="tab-panel active">
+        <div class="card-title">Piekaandeel per maand (% van het dagverbruik)</div>
+        <div class="chart-wrap"><canvas id="chart-pk-monthly"></canvas></div>
+      </div>
+      <div id="pk-tab-daily" class="tab-panel">
+        <div class="card-title">Piekaandeel per dag (% van het dagverbruik)</div>
+        <div class="chart-wrap-tall"><canvas id="chart-pk-daily"></canvas></div>
+      </div>
+      <div id="pk-tab-profile" class="tab-panel">
+        <div class="card-title">Gemiddelde netafname per uur in de piekmaanden (kW)</div>
+        <div class="chart-wrap"><canvas id="chart-pk-profile"></canvas></div>
+      </div>
+      <div id="pk-tab-capacity" class="tab-panel">
+        <div class="card-title">Piekaandeel bij verschillende batterijgroottes</div>
+        <div class="chart-wrap"><canvas id="chart-pk-capacity"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tariff-note" style="margin-top:12px">
+      <strong>Aannames:</strong> het model kent het verbruik van de dag vooraf en geeft dus het theoretisch haalbare
+      maximum. De batterij begint elke aaneengesloten periode vol, levert nooit terug aan het net, en het bijladen
+      (inclusief rendementsverlies) telt mee in het dagverbruik.
+    </div>
   </div>
 
   <!-- ══ RESULTATEN ════════════════════════════════════════════════════════ -->
@@ -266,11 +405,12 @@
 </div><!-- /container -->
 
 <!-- Scripts laden in volgorde: utilities eerst, app.js als laatste -->
-<script src="js/csv-parser.js?v=8"></script>
-<script src="js/battery-sim.js?v=8"></script>
-<script src="js/pricing.js?v=8"></script>
-<script src="js/charts.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/csv-parser.js?v=9"></script>
+<script src="js/battery-sim.js?v=9"></script>
+<script src="js/peak-sim.js?v=9"></script>
+<script src="js/pricing.js?v=9"></script>
+<script src="js/charts.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 
 </body>
 </html>

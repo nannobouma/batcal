@@ -305,6 +305,182 @@ const Charts = (() => {
     });
   }
 
+  // ── 6. Piekverlaging ─────────────────────────────────────────────────────
+
+  const pctScale = {
+    min: 0,
+    ticks: { callback: v => `${v}%` },
+    grid: { color: 'rgba(0,0,0,0.05)' },
+  };
+  const pctTooltip = {
+    callbacks: { label: ctx => ` ${ctx.dataset.label}: ${(+ctx.raw).toFixed(1)}%` },
+  };
+
+  function targetDataset(n, targetPct) {
+    return {
+      type: 'line',
+      label: `Streefwaarde ${targetPct}%`,
+      data: Array(n).fill(targetPct),
+      borderColor: COLORS.red,
+      borderDash: [6, 4],
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+    };
+  }
+
+  function renderPeakMonthly(canvasId, monthly, targetPct) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    _charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: monthly.map(m => m.label),
+        datasets: [
+          {
+            label: 'Zonder batterij',
+            data: monthly.map(m => +m.shareRef.toFixed(1)),
+            backgroundColor: COLORS.grayDim, borderColor: COLORS.gray,
+            borderWidth: 1.5, borderRadius: 4,
+          },
+          {
+            label: 'Met batterij',
+            data: monthly.map(m => +m.shareBat.toFixed(1)),
+            backgroundColor: COLORS.blueDim, borderColor: COLORS.blue,
+            borderWidth: 1.5, borderRadius: 4,
+          },
+          targetDataset(monthly.length, targetPct),
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { tooltip: pctTooltip },
+        scales: { x: { grid: { display: false } }, y: pctScale },
+      },
+    });
+  }
+
+  function renderPeakDaily(canvasId, days, targetPct) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const fmt = d => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' });
+    _charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: days.map(d => fmt(d.date)),
+        datasets: [
+          {
+            label: 'Zonder batterij',
+            data: days.map(d => +d.shareRef.toFixed(1)),
+            borderColor: COLORS.gray, borderWidth: 1.5, pointRadius: 0, tension: 0.2,
+          },
+          {
+            label: 'Met batterij',
+            data: days.map(d => +d.shareBat.toFixed(1)),
+            borderColor: COLORS.blue, backgroundColor: COLORS.blueDim,
+            borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: true,
+          },
+          targetDataset(days.length, targetPct),
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { tooltip: pctTooltip },
+        scales: {
+          x: { ticks: { maxTicksLimit: 12, maxRotation: 0 }, grid: { display: false } },
+          y: pctScale,
+        },
+      },
+    });
+  }
+
+  function renderPeakProfile(canvasId, profile, peakStartHour, peakEndHour) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const labels = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
+    const inPeak = h => h >= peakStartHour && h < peakEndHour;
+    _charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Zonder batterij',
+            data: profile.ref.map(v => +v.toFixed(3)),
+            backgroundColor: labels.map((_, h) => inPeak(h) ? COLORS.orangeDim : COLORS.grayDim),
+            borderColor:     labels.map((_, h) => inPeak(h) ? COLORS.orange    : COLORS.gray),
+            borderWidth: 1, borderRadius: 3,
+          },
+          {
+            label: 'Met batterij',
+            data: profile.bat.map(v => +v.toFixed(3)),
+            backgroundColor: COLORS.blueDim, borderColor: COLORS.blue,
+            borderWidth: 1, borderRadius: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${(+ctx.raw).toFixed(2)} kW gem.` },
+          },
+        },
+        scales: {
+          x: { grid: { display: false } },
+          y: { min: 0, ticks: { callback: v => `${v} kW` }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        },
+      },
+    });
+  }
+
+  function renderPeakCapacity(canvasId, sweep, targetPct, currentCapacity) {
+    destroy(canvasId);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    _charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: sweep.map(s => `${s.capacity} kWh`),
+        datasets: [
+          {
+            label: 'Piekaandeel',
+            data: sweep.map(s => +s.shareBat.toFixed(1)),
+            borderColor: COLORS.blue, backgroundColor: COLORS.blueDim,
+            fill: true, tension: 0.2, borderWidth: 2,
+            pointRadius: sweep.map(s => s.capacity === currentCapacity ? 6 : 3),
+            pointBackgroundColor: sweep.map(s => s.capacity === currentCapacity ? COLORS.orange : COLORS.blue),
+          },
+          targetDataset(sweep.length, targetPct),
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${(+ctx.raw).toFixed(1)}%`,
+              afterBody: items => {
+                const s = sweep[items[0].dataIndex];
+                return s ? [`Piekafname: ${s.peakPerDay.toFixed(2)} kWh/dag`,
+                            `Onder streefwaarde: ${s.daysUnderTargetBat} van ${s.days} dagen`] : [];
+              },
+            },
+          },
+        },
+        scales: { x: { grid: { display: false } }, y: pctScale },
+      },
+    });
+  }
+
   // ── Utils ────────────────────────────────────────────────────────────────
 
   function getWeekIntervals(intervals, weekOffset = 0) {
@@ -333,6 +509,10 @@ const Charts = (() => {
     renderSOC,
     renderDailyProfile,
     renderEnergyFlow,
+    renderPeakMonthly,
+    renderPeakDaily,
+    renderPeakProfile,
+    renderPeakCapacity,
     getWeekIntervals,
   };
 

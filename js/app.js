@@ -5,6 +5,7 @@
 
 // ── State ────────────────────────────────────────────────────────────────────
 var _parsedData   = null;  // Genormaliseerde kwartierdata
+var _parsedFormat = '';    // Gedetecteerd CSV-formaat
 var _simResult    = null;  // Laatste simulatieresultaat
 var _weekOffset   = 0;     // Geselecteerde week voor SOC-grafiek
 var _mode         = 'fixed'; // 'fixed' | 'dynamic'
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabSwitcher();
   initWeekNav();
   $('btn-calc').addEventListener('click', runCalculation);
+  $('btn-peak').addEventListener('click', runPeakCalculation);
   updateCalcButton();
 });
 
@@ -55,7 +57,8 @@ function handleFile(file) {
       return;
     }
 
-    _parsedData = result.data;
+    _parsedData   = result.data;
+    _parsedFormat = result.meta.format;
     showFileInfo(file.name, result.meta);
     hideAlert('alert-parse');
     updateCalcButton();
@@ -302,8 +305,9 @@ function initTabSwitcher() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      const group  = btn.closest('.card') || document;   // alleen de eigen tab-groep
+      group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      group.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       $(target).classList.add('active');
     });
@@ -321,6 +325,108 @@ function setLoading(loading) {
 
 function updateCalcButton() {
   $('btn-calc').disabled = !_parsedData;
+  $('btn-peak').disabled = !_parsedData;
+}
+
+// ── Piekverlaging (Vermijd de piek) ───────────────────────────────────────────
+function numOr(id, fallback) {
+  const v = parseFloat($(id).value);
+  return Number.isFinite(v) ? v : fallback;   // 0 is een geldige waarde
+}
+
+function getPeakParams() {
+  const peakStartHour = Math.min(23, Math.max(0, numOr('pk-start', 16)));
+  const peakEndHour   = Math.min(24, Math.max(peakStartHour + 1, numOr('pk-end', 21)));
+  return {
+    capacity:        Math.max(0, numOr('p-capacity', 5)),
+    efficiency:      Math.min(1, Math.max(0.5, numOr('p-efficiency', 85) / 100)),
+    maxPowerKw:      Math.max(0, numOr('pk-power', 3)),
+    peakStartHour,
+    peakEndHour,
+    targetPct:       numOr('pk-target', 36),
+    chargeStartHour: Math.max(0, numOr('pk-ch-start', 0)),
+    chargeEndHour:   numOr('pk-ch-end', 6),
+    // Liander/Enexis-export heeft een 'van'-tijd (kwartier-start); overige formaten kwartier-einde
+    intervalEnd:     !/Liander/.test(_parsedFormat || ''),
+  };
+}
+
+function runPeakCalculation() {
+  if (!_parsedData || _parsedData.length === 0) return;
+  hideAlert('alert-peak');
+
+  const params = getPeakParams();
+  const result = simulatePeakShaving(_parsedData, params);
+
+  if (result.days.length === 0) {
+    $('peak-results').classList.add('hidden');
+    showAlert('alert-peak',
+      'Geen volledige dagen in november t/m februari gevonden in deze data.', 'warn');
+    return;
+  }
+  if (params.chargeEndHour > params.peakStartHour || params.chargeEndHour <= params.chargeStartHour) {
+    showAlert('alert-peak',
+      'Let op: het laadvenster moet vóór het piekvenster op dezelfde dag liggen; het is daarop begrensd.', 'warn');
+  }
+
+  const caps = [...new Set([0, 1, 2, 3, 4, 5, 7.5, 10, 15, 20, params.capacity])].sort((a, b) => a - b);
+  const sweep = sweepPeakCapacity(_parsedData, params, caps);
+
+  renderPeakResults(result, sweep);
+  $('peak-results').classList.remove('hidden');
+  $('peak-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPeakResults(result, sweep) {
+  const { totals: t, monthly, days, params, skippedDays } = result;
+  const pct = v => `${v.toFixed(1)}%`;
+  const hasBat = params.capacity > 0;
+
+  $('pk-kpi-share').textContent     = pct(t.shareBat);
+  $('pk-kpi-share').className       = `kpi-value ${t.shareBat <= params.targetPct ? 'green' : ''}`;
+  $('pk-kpi-share-sub').textContent = hasBat
+    ? `zonder batterij ${pct(t.shareRef)}` : 'van het dagverbruik (zonder batterij)';
+
+  $('pk-kpi-kwh').textContent     = `${(t.peakBat / t.days).toFixed(1)} kWh`;
+  $('pk-kpi-kwh-sub').textContent = hasBat
+    ? `per dag · zonder ${(t.peakRef / t.days).toFixed(1)} kWh` : 'gemiddeld per dag';
+
+  $('pk-kpi-kw').textContent     = `${t.maxKwBat.toFixed(1)} kW`;
+  $('pk-kpi-kw-sub').textContent = hasBat
+    ? `kwartiergemiddelde · zonder ${t.maxKwRef.toFixed(1)} kW` : 'hoogste kwartiergemiddelde';
+
+  $('pk-kpi-target').textContent     = `${t.daysUnderTargetBat} / ${t.days}`;
+  $('pk-kpi-target-sub').textContent = hasBat
+    ? `≤ ${params.targetPct}% · zonder ${t.daysUnderTargetRef}` : `dagen ≤ ${params.targetPct}%`;
+
+  $('pk-kpi-zero').textContent     = `${t.daysZero} / ${t.days}`;
+  $('pk-kpi-zero-sub').textContent = 'piek volledig uit de batterij';
+
+  const fmtDate = d => d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+  $('pk-note').textContent =
+    `${t.days} dagen (${fmtDate(days[0].date)} – ${fmtDate(days[days.length - 1].date)}), ` +
+    `piekvenster ${params.peakStartHour}:00–${params.peakEndHour}:00, ` +
+    `batterij ${params.capacity} kWh / ${params.maxPowerKw} kW` +
+    (skippedDays ? ` · ${skippedDays} onvolledige dag(en) overgeslagen` : '') + '.';
+
+  const cls = v => v <= params.targetPct ? 'under-target' : 'over-target';
+  const row = (m, extra = '') => `
+    <tr class="${extra}">
+      <td>${m.label}</td>
+      <td>${m.days}</td>
+      <td>${m.peakRef.toFixed(0)}</td>
+      <td>${m.peakBat.toFixed(0)}</td>
+      <td>${m.totalRef.toFixed(0)}</td>
+      <td>${m.totalBat.toFixed(0)}</td>
+      <td class="${cls(m.shareRef)}">${pct(m.shareRef)}</td>
+      <td class="${cls(m.shareBat)}">${pct(m.shareBat)}</td>
+    </tr>`;
+  $('pk-table-body').innerHTML = monthly.map(m => row(m)).join('') + row(t, 'total-row');
+
+  Charts.renderPeakMonthly('chart-pk-monthly', monthly, params.targetPct);
+  Charts.renderPeakDaily('chart-pk-daily', days, params.targetPct);
+  Charts.renderPeakProfile('chart-pk-profile', result.profile, params.peakStartHour, params.peakEndHour);
+  Charts.renderPeakCapacity('chart-pk-capacity', sweep, params.targetPct, params.capacity);
 }
 
 function showAlert(id, msg, type) {
