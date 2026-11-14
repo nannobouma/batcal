@@ -441,7 +441,7 @@ const Charts = (() => {
     });
   }
 
-  function renderPeakCapacity(canvasId, sweep, targetPct, currentCapacity) {
+  function renderPeakCapacity(canvasId, sweep, targetPct, currentCapacity, showNet = false) {
     destroy(canvasId);
     const ctx = document.getElementById(canvasId).getContext('2d');
     _charts[canvasId] = new Chart(ctx, {
@@ -470,8 +470,11 @@ const Charts = (() => {
               label: ctx => ` ${ctx.dataset.label}: ${(+ctx.raw).toFixed(1)}%`,
               afterBody: items => {
                 const s = sweep[items[0].dataIndex];
-                return s ? [`Piekafname: ${s.peakPerDay.toFixed(2)} kWh/dag`,
-                            `Onder streefwaarde: ${s.daysUnderTargetBat} van ${s.days} dagen`] : [];
+                if (!s) return [];
+                const lines = [`Piekafname: ${s.peakPerDay.toFixed(2)} kWh/dag`,
+                               `Onder streefwaarde: ${s.daysUnderTargetBat} van ${s.days} dagen`];
+                if (showNet) lines.push(`Netto dynamisch tarief: ${s.netEur < 0 ? '−' : ''}€${Math.abs(s.netEur).toFixed(0)}`);
+                return lines;
               },
             },
           },

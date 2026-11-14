@@ -316,6 +316,39 @@ header span { opacity: .7; font-size: .875rem; }
 .week-nav button:hover { background: var(--bg); }
 #week-label { min-width: 160px; text-align: center; font-weight: 500; }
 
+/* ── Twee gelijkwaardige opties naast elkaar ── */
+.step-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .options-grid { grid-template-columns: 1fr; }
+}
+.option-card { border-top: 4px solid var(--primary); }
+.option-badge {
+  background: var(--primary);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: .75rem;
+  letter-spacing: .03em;
+}
+.option-intro {
+  font-size: .875rem;
+  color: var(--text-2);
+  margin-bottom: 16px;
+  min-height: 3.9em;
+}
+.option-card .param-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+
 /* ── Data table ── */
 .table-scroll { overflow-x: auto; }
 .data-table { width: 100%; border-collapse: collapse; font-size: .9rem; }

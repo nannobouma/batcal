@@ -45,19 +45,24 @@
     <div id="alert-parse" class="alert"></div>
   </div>
 
-  <!-- ══ STAP 2: PARAMETERS ═══════════════════════════════════════════════ -->
-  <div class="card section-gap">
+  <!-- ══ STAP 2: KIES EEN BEREKENING ═══════════════════════════════════════ -->
+  <div class="step-heading section-gap">Stap 2 — Kies een berekening</div>
+  <div class="options-grid">
+
+  <!-- ── Optie 1: Rendement ─────────────────────────────────────────────── -->
+  <div class="card option-card">
     <div class="card-title">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-      </svg>
-      Stap 2 — Parameters instellen
+      <span class="option-badge">Optie 1</span>
+      Rendement berekenen
+    </div>
+    <div class="option-intro">
+      Wat levert de batterij financieel op door meer eigen zonnestroom te gebruiken, bij een vast of dynamisch tarief?
     </div>
 
     <div class="param-grid">
       <div class="param-group">
         <label for="p-capacity">Batterijcapaciteit (netto)</label>
-        <input type="number" id="p-capacity" value="5" min="0" max="50" step="0.5">
+        <input type="number" id="p-capacity" value="5" min="0.5" max="50" step="0.5">
         <div class="param-unit">kWh</div>
       </div>
       <div class="param-group">
@@ -127,23 +132,28 @@
     <div id="alert-calc" class="alert" style="margin-top:12px"></div>
   </div>
 
-  <!-- ══ PIEKVERLAGING ═════════════════════════════════════════════════════ -->
-  <div class="card section-gap">
+  <!-- ── Optie 2: Piekverlaging ─────────────────────────────────────────── -->
+  <div class="card option-card">
     <div class="card-title">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path d="M3 17l6-6 4 4 8-8M14 7h7v7"/>
-      </svg>
-      Piekverlaging — Vermijd de piek (november t/m februari)
+      <span class="option-badge">Optie 2</span>
+      Piekverlaging berekenen
     </div>
-
-    <div class="tariff-note" style="max-width:760px; margin:0 0 16px">
-      Hoe ver kan de batterij uw netafname in de avondpiek terugbrengen? De batterij laadt buiten de piek
-      (zon-overschot eerst, de rest 's nachts uit het net) en ontlaadt in het piekvenster zo dat de resterende
-      afname zo laag en vlak mogelijk is. Gebruikt de batterijcapaciteit en efficiëntie uit stap 2;
-      vul <strong>0 kWh</strong> in om de situatie zonder batterij te zien.
+    <div class="option-intro">
+      Hoe ver kan de batterij uw netafname in de avondpiek (november t/m februari) terugbrengen, en wat kost of
+      levert dat op bij een dynamisch tarief? Vul 0 kWh in voor de situatie zonder batterij.
     </div>
 
     <div class="param-grid">
+      <div class="param-group">
+        <label for="pk-capacity">Batterijcapaciteit (netto)</label>
+        <input type="number" id="pk-capacity" value="5" min="0" max="50" step="0.5">
+        <div class="param-unit">kWh (0 = zonder batterij)</div>
+      </div>
+      <div class="param-group">
+        <label for="pk-efficiency">Roundtrip efficiëntie</label>
+        <input type="number" id="pk-efficiency" value="85" min="50" max="99" step="1">
+        <div class="param-unit">% (typisch 80–95%)</div>
+      </div>
       <div class="param-group">
         <label for="pk-power">Max. (ont)laadvermogen</label>
         <input type="number" id="pk-power" value="3" min="0" max="25" step="0.5">
@@ -174,15 +184,26 @@
         <input type="number" id="pk-ch-end" value="6" min="1" max="24" step="1">
         <div class="param-unit">uur (vóór het piekvenster)</div>
       </div>
+      <div class="param-group">
+        <label for="pk-surcharge">Opslag op EPEX-prijs</label>
+        <input type="number" id="pk-surcharge" value="0.12" min="0" max="0.50" step="0.01">
+        <div class="param-unit">€/kWh — belasting, netkosten en marge bij afname (dynamisch tarief)</div>
+      </div>
     </div>
 
-    <div style="margin-top:20px">
-      <button id="btn-peak" class="btn btn-primary" disabled>Bereken piekverlaging</button>
+    <div style="margin-top:20px; display:flex; align-items:center; gap:12px">
+      <button id="btn-peak" class="btn btn-primary" disabled>
+        <span class="btn-text">Bereken piekverlaging</span>
+        <div id="peak-spinner" class="spinner"></div>
+      </button>
     </div>
     <div id="alert-peak" class="alert" style="margin-top:12px"></div>
   </div>
 
+  </div><!-- /options-grid -->
+
   <div id="peak-results" class="hidden section-gap">
+    <div class="step-heading">Resultaat optie 2 — Piekverlaging</div>
     <div class="grid-5">
       <div class="kpi-card">
         <div class="kpi-label">Piekaandeel</div>
@@ -226,11 +247,25 @@
               <th>Dagtotaal met (kWh)</th>
               <th>Aandeel zonder</th>
               <th>Aandeel met</th>
+              <th>Netto (€)</th>
             </tr>
           </thead>
           <tbody id="pk-table-body"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card section-gap">
+      <div class="card-title">Kosten en opbrengsten bij dynamisch tarief</div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr><th></th><th>kWh</th><th>Gem. prijs</th><th>Bedrag</th></tr>
+          </thead>
+          <tbody id="pk-fin-body"></tbody>
+        </table>
+      </div>
+      <div id="pk-fin-note" class="tariff-note" style="margin-top:12px"></div>
     </div>
 
     <div class="card section-gap">
@@ -268,6 +303,7 @@
 
   <!-- ══ RESULTATEN ════════════════════════════════════════════════════════ -->
   <div id="results-section" class="hidden section-gap">
+    <div class="step-heading">Resultaat optie 1 — Rendement</div>
 
     <!-- KPI Kaarten -->
     <div class="grid-5">
@@ -429,12 +465,12 @@
 </div><!-- /container -->
 
 <!-- Scripts laden in volgorde: utilities eerst, app.js als laatste -->
-<script src="js/csv-parser.js?v=10"></script>
-<script src="js/battery-sim.js?v=10"></script>
-<script src="js/peak-sim.js?v=10"></script>
-<script src="js/pricing.js?v=10"></script>
-<script src="js/charts.js?v=10"></script>
-<script src="js/app.js?v=10"></script>
+<script src="js/csv-parser.js?v=11"></script>
+<script src="js/battery-sim.js?v=11"></script>
+<script src="js/peak-sim.js?v=11"></script>
+<script src="js/pricing.js?v=11"></script>
+<script src="js/charts.js?v=11"></script>
+<script src="js/app.js?v=11"></script>
 
 </body>
 </html>

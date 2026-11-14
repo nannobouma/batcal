@@ -28,6 +28,8 @@ const PEAK_DEFAULTS = {
   targetPct:       36,
   intervalEnd:     true,   // tijdstempel = einde van het kwartier
   minIntervals:    90,     // minimum aantal kwartieren voor een bruikbare dag
+  priceMap:        null,   // Map<kwartier-start ms, EPEX €/kWh> voor de financiële berekening
+  surcharge:       0.12,   // opslag op de EPEX-prijs bij afname (€/kWh)
 };
 
 /**
@@ -61,6 +63,7 @@ function simulatePeakShaving(data, params) {
         del: new Array(96).fill(0),
         ret: new Array(96).fill(0),
         has: new Array(96).fill(false),
+        t0: start.getTime() - (start.getHours() * 4 + Math.floor(start.getMinutes() / 15)) * 900000,
         count: 0,
       };
       dayMap.set(key, day);
@@ -91,6 +94,7 @@ function simulatePeakShaving(data, params) {
   for (const d of days) {
     const charge    = new Array(96).fill(0);   // extra netafname voor laden
     const discharge = new Array(96).fill(0);   // door batterij gedekte afname
+    const solarIn   = new Array(96).fill(0);   // zon-overschot dat de batterij in gaat
     let solarCharged = 0;
     let gridCharged  = 0;
 
@@ -106,6 +110,7 @@ function simulatePeakShaving(data, params) {
         const stored = Math.min(d.ret[s], maxQ) * chargeEff;
         const take   = Math.min(stored, deficit - solarStored);
         solarStored += take;
+        solarIn[s]   = take / chargeEff;
       }
       solarCharged = solarStored;
 
@@ -149,6 +154,21 @@ function simulatePeakShaving(data, params) {
     }
     const totalBat = totalRef - discharged + gridCharged;
 
+    // ── Financieel (dynamisch tarief) ──────────────────────────────────────
+    // Afname kost EPEX + opslag; teruglevering levert de kale EPEX-prijs op.
+    let avoidedEur = 0, chargeEur = 0, lostFeedInEur = 0, solarInKwh = 0, unpriced = 0;
+    if (p.priceMap) {
+      for (let s = 0; s < 96; s++) {
+        if (!discharge[s] && !charge[s] && !solarIn[s]) continue;
+        const price = peakPriceLookup(p.priceMap, d.t0 + s * 900000);
+        if (price === null) { unpriced += discharge[s] + charge[s] + solarIn[s]; continue; }
+        avoidedEur    += discharge[s] * (price + p.surcharge);
+        chargeEur     += charge[s]    * (price + p.surcharge);
+        lostFeedInEur += solarIn[s]   * price;
+      }
+    }
+    for (let s = 0; s < 96; s++) solarInKwh += solarIn[s];
+
     dayResults.push({
       key: d.key,
       date: d.date,
@@ -161,6 +181,8 @@ function simulatePeakShaving(data, params) {
       maxKwRef: maxRef * 4,
       maxKwBat: maxBat * 4,
       discharged, gridCharged, solarCharged,
+      solarInKwh, avoidedEur, chargeEur, lostFeedInEur, unpriced,
+      netEur: avoidedEur - chargeEur - lostFeedInEur,
       socEnd: soc,
     });
     prevDate = d.date;
@@ -179,6 +201,12 @@ function simulatePeakShaving(data, params) {
       a.discharged += r.discharged;
       a.gridCharged += r.gridCharged;
       a.solarCharged += r.solarCharged;
+      a.solarInKwh   += r.solarInKwh;
+      a.avoidedEur   += r.avoidedEur;
+      a.chargeEur    += r.chargeEur;
+      a.lostFeedInEur += r.lostFeedInEur;
+      a.netEur       += r.netEur;
+      a.unpriced     += r.unpriced;
       a.maxKwRef = Math.max(a.maxKwRef, r.maxKwRef);
       a.maxKwBat = Math.max(a.maxKwBat, r.maxKwBat);
       if (r.totalRef > 0 && r.shareRef <= p.targetPct) a.daysUnderTargetRef++;
@@ -219,6 +247,7 @@ function sweepPeakCapacity(data, params, capacities) {
       maxKwBat: t.maxKwBat,
       daysUnderTargetBat: t.daysUnderTargetBat,
       days: t.days,
+      netEur: t.netEur,
     };
   });
 }
@@ -228,10 +257,19 @@ function newPeakAgg(label) {
     label, days: 0,
     peakRef: 0, peakBat: 0, totalRef: 0, totalBat: 0,
     discharged: 0, gridCharged: 0, solarCharged: 0,
+    solarInKwh: 0, avoidedEur: 0, chargeEur: 0, lostFeedInEur: 0, netEur: 0, unpriced: 0,
     maxKwRef: 0, maxKwBat: 0,
     daysUnderTargetRef: 0, daysUnderTargetBat: 0, daysZero: 0,
     shareRef: 0, shareBat: 0,
   };
+}
+
+/** EPEX-prijs voor een kwartier-start; valt terug op de uurprijs. null = onbekend. */
+function peakPriceLookup(priceMap, tsMs) {
+  if (priceMap.has(tsMs)) return priceMap.get(tsMs);
+  const hour = Math.floor(tsMs / 3600000) * 3600000;
+  if (priceMap.has(hour)) return priceMap.get(hour);
+  return null;
 }
 
 /**

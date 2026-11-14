@@ -390,8 +390,9 @@ function getPeakParams() {
   const peakStartHour = Math.min(23, Math.max(0, numOr('pk-start', 16)));
   const peakEndHour   = Math.min(24, Math.max(peakStartHour + 1, numOr('pk-end', 21)));
   return {
-    capacity:        Math.max(0, numOr('p-capacity', 5)),
-    efficiency:      Math.min(1, Math.max(0.5, numOr('p-efficiency', 85) / 100)),
+    capacity:        Math.max(0, numOr('pk-capacity', 5)),
+    efficiency:      Math.min(1, Math.max(0.5, numOr('pk-efficiency', 85) / 100)),
+    surcharge:       Math.max(0, numOr('pk-surcharge', 0.12)),
     maxPowerKw:      Math.max(0, numOr('pk-power', 3)),
     peakStartHour,
     peakEndHour,
@@ -403,12 +404,35 @@ function getPeakParams() {
   };
 }
 
-function runPeakCalculation() {
+function setPeakLoading(loading) {
+  const btn = $('btn-peak');
+  btn.disabled = loading;
+  $('peak-spinner').classList.toggle('visible', loading);
+  btn.querySelector('.btn-text').textContent = loading ? 'Berekenen...' : 'Bereken piekverlaging';
+}
+
+/** Haalt EPEX-prijzen op voor alleen de maanden waarin piekdagen vallen. */
+async function loadPeakPrices(days) {
+  const monthKeys = [...new Set(days.map(d => d.monthKey))];
+  const priceMap  = new Map();
+  let done = 0;
+  for (const key of monthKeys) {
+    showAlert('alert-peak', `Dynamische prijzen ophalen (${done}/${monthKeys.length} maanden)...`, 'info');
+    const [y, m] = key.split('-').map(Number);
+    const first  = new Date(y, m - 1, 1);
+    const part   = await Pricing.loadPrices(first, first);
+    for (const [ts, price] of part) priceMap.set(ts, price);
+    done++;
+  }
+  return priceMap.size > 0 ? priceMap : null;
+}
+
+async function runPeakCalculation() {
   if (!_parsedData || _parsedData.length === 0) return;
   hideAlert('alert-peak');
 
-  const params = getPeakParams();
-  const result = simulatePeakShaving(_parsedData, params);
+  let params = getPeakParams();
+  let result = simulatePeakShaving(_parsedData, params);
 
   if (result.days.length === 0) {
     $('peak-results').classList.add('hidden');
@@ -416,6 +440,26 @@ function runPeakCalculation() {
       'Geen volledige dagen in november t/m februari gevonden in deze data.', 'warn');
     return;
   }
+
+  // ── Dynamische prijzen voor de kosten/opbrengsten ─────────────────────────
+  setPeakLoading(true);
+  let priceMap = null;
+  try {
+    priceMap = await loadPeakPrices(result.days);
+  } catch (err) {
+    console.warn('Prijzen ophalen mislukt:', err);
+  } finally {
+    setPeakLoading(false);
+  }
+  hideAlert('alert-peak');
+  if (priceMap) {
+    params = { ...params, priceMap };
+    result = simulatePeakShaving(_parsedData, params);
+  } else {
+    showAlert('alert-peak',
+      'Dynamische prijzen niet beschikbaar: de kosten en opbrengsten worden niet getoond.', 'warn');
+  }
+
   if (params.chargeEndHour > params.peakStartHour || params.chargeEndHour <= params.chargeStartHour) {
     showAlert('alert-peak',
       'Let op: het laadvenster moet vóór het piekvenster op dezelfde dag liggen; het is daarop begrensd.', 'warn');
@@ -432,6 +476,7 @@ function runPeakCalculation() {
 function renderPeakResults(result, sweep) {
   const { totals: t, monthly, days, params, skippedDays } = result;
   const pct = v => `${v.toFixed(1)}%`;
+  const eur = v => `${v < 0 ? '−' : ''}€${Math.abs(v).toFixed(2)}`;
   const hasBat = params.capacity > 0;
 
   $('pk-kpi-share').textContent     = pct(t.shareBat);
@@ -472,13 +517,43 @@ function renderPeakResults(result, sweep) {
       <td>${m.totalBat.toFixed(0)}</td>
       <td class="${cls(m.shareRef)}">${pct(m.shareRef)}</td>
       <td class="${cls(m.shareBat)}">${pct(m.shareBat)}</td>
+      <td>${params.priceMap ? eur(m.netEur) : '—'}</td>
     </tr>`;
   $('pk-table-body').innerHTML = monthly.map(m => row(m)).join('') + row(t, 'total-row');
+
+  // ── Kosten en opbrengsten bij dynamisch tarief ────────────────────────────
+  if (params.priceMap) {
+    const avg = (amount, kwh) => kwh > 0.001 ? `€${(amount / kwh).toFixed(3)}/kWh` : '—';
+    const fin = (label, kwh, amount, sign, cls = '') => `
+      <tr class="${cls}">
+        <td>${label}</td>
+        <td>${kwh === null ? '' : kwh.toFixed(0)}</td>
+        <td>${kwh === null ? '' : avg(amount, kwh)}</td>
+        <td>${eur(sign * amount)}</td>
+      </tr>`;
+    $('pk-fin-body').innerHTML =
+      fin('Vermeden afname in de piek', t.discharged, t.avoidedEur, 1) +
+      fin('Bijladen uit het net (nacht)', t.gridCharged, t.chargeEur, -1) +
+      fin('Gemiste teruglevering (zon in batterij)', t.solarInKwh, t.lostFeedInEur, -1) +
+      fin('Netto resultaat', null, t.netEur, 1, 'total-row');
+
+
+    let note = `Over ${t.days} dagen in de piekmaanden. Afname gerekend tegen de EPEX day-ahead prijs ` +
+      `+ €${params.surcharge.toFixed(2)}/kWh opslag; teruglevering tegen de kale EPEX-prijs (excl. btw). ` +
+      `Een positief netto resultaat is een opbrengst, een negatief resultaat zijn kosten. ` +
+      `De batterij is hier op piekverlaging gestuurd, niet op de laagste prijs; ` +
+      `investering en afschrijving van de batterij zijn niet meegerekend.`;
+    if (t.unpriced > 0.5) note += ` Voor ${t.unpriced.toFixed(0)} kWh was geen prijs beschikbaar; die is niet meegeteld.`;
+    $('pk-fin-note').innerHTML = note;
+  } else {
+    $('pk-fin-body').innerHTML = '<tr><td colspan="4">Dynamische prijzen niet beschikbaar.</td></tr>';
+    $('pk-fin-note').textContent = '';
+  }
 
   Charts.renderPeakMonthly('chart-pk-monthly', monthly, params.targetPct);
   Charts.renderPeakDaily('chart-pk-daily', days, params.targetPct);
   Charts.renderPeakProfile('chart-pk-profile', result.profile, params.peakStartHour, params.peakEndHour);
-  Charts.renderPeakCapacity('chart-pk-capacity', sweep, params.targetPct, params.capacity);
+  Charts.renderPeakCapacity('chart-pk-capacity', sweep, params.targetPct, params.capacity, !!params.priceMap);
 }
 
 function showAlert(id, msg, type) {
