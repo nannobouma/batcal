@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #f0f4f8;
   --surface: #ffffff;
   --surface2: #f8fafc;
@@ -376,8 +376,8 @@ header span { opacity: .7; font-size: .875rem; }
 .tab-btn { white-space: nowrap; }
 
 /* ── Header-knop, secundaire knop ── */
+.header-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .btn-header {
-  margin-left: auto;
   background: rgba(255,255,255,.14);
   color: #fff;
   border: 1px solid rgba(255,255,255,.35);
@@ -395,7 +395,39 @@ header > svg { flex-shrink: 0; }
 .btn-secondary:disabled { color: var(--text-3); border-color: var(--border); cursor: not-allowed; }
 @media (max-width: 600px) {
   header { flex-wrap: wrap; }
-  .btn-header { margin-left: 40px; }
+  .header-actions { margin-left: 40px; justify-content: flex-start; }
+}
+@media (max-width: 900px) {
+  .btn-header { padding: 8px 14px; font-size: .8125rem; }
+}
+
+/* ── Uitleg & verantwoording ── */
+.modal.modal-wide { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0; }
+.modal.modal-wide[open] { display: flex; flex-direction: column; }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 24px; border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; }
+.modal-x {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 1.1rem; color: var(--text-2); padding: 4px 8px; border-radius: 6px;
+}
+.modal-x:hover { background: var(--bg); }
+.modal-wide .modal-actions { padding: 14px 24px; border-top: 1px solid var(--border); margin: 0; }
+.about-body { padding: 20px 24px; overflow-y: auto; font-size: .9rem; }
+.about-body h3 { font-size: 1rem; margin: 22px 0 8px; color: var(--primary); }
+.about-body p { margin-bottom: 10px; }
+.about-body ul { margin: 0 0 10px 20px; }
+.about-body li { margin-bottom: 6px; }
+.about-sub { font-weight: 600; margin-top: 12px; }
+.about-disclaimer {
+  background: var(--warning-light);
+  border: 1px solid #fcd34d;
+  border-left: 4px solid var(--warning);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #7c4a03;
 }
 
 /* ── Voorbeelddata ── */

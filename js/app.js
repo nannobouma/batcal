@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-peak').addEventListener('click', runPeakCalculation);
   $('btn-sample').addEventListener('click', loadSampleData);
   initContact();
+  initAbout();
   updateCalcButton();
 });
 
@@ -96,6 +97,17 @@ async function loadSampleData() {
   }
 }
 
+// ── Uitleg & verantwoording ──────────────────────────────────────────────────
+function initAbout() {
+  const dialog = $('about-dialog');
+  $('btn-about').addEventListener('click', () => {
+    dialog.showModal();
+    dialog.querySelector('.about-body').scrollTop = 0;
+  });
+  dialog.querySelectorAll('[data-close-about]').forEach(b => b.addEventListener('click', () => dialog.close()));
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+}
+
 // ── Contactformulier ─────────────────────────────────────────────────────────
 const CONTACT_EMAIL = 'nannobouma@gmail.com';
 
@@ -123,15 +135,37 @@ function initContact() {
   });
 }
 
-/** Verstuurt de vraag via het mailprogramma van de bezoeker. */
-function sendContact({ name, email, message }) {
-  const subject = 'Vraag over de Thuisbatterij ROI Calculator';
-  const body    = `${message}\n\n— ${name || 'Naam niet ingevuld'}\n${email}`;
-  window.location.href =
-    `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  showAlert('alert-contact',
-    'Uw mailprogramma wordt geopend met de vraag ingevuld. Verstuur de e-mail daar om de vraag te versturen.',
-    'success');
+/** Verstuurt de vraag via FormSubmit (formsubmit.co); de bezoeker blijft op de pagina. */
+async function sendContact({ name, email, message }) {
+  const btn = $('ct-send');
+  btn.disabled = true;
+  btn.textContent = 'Versturen…';
+  try {
+    const resp = await fetch(`https://formsubmit.co/ajax/${CONTACT_EMAIL}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        name:      name || 'Naam niet ingevuld',
+        email,
+        message,
+        _subject:  'Vraag over de Thuisbatterij ROI Calculator',
+        _template: 'table',
+        _captcha:  'false',
+        _honey:    $('ct-honey').value,
+      }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || String(json.success) !== 'true') throw new Error(json.message || 'HTTP ' + resp.status);
+
+    $('contact-form').reset();
+    showAlert('alert-contact', 'Bedankt, uw vraag is verstuurd. U krijgt antwoord per e-mail.', 'success');
+  } catch (err) {
+    showAlert('alert-contact',
+      `Versturen is niet gelukt. Probeer het later opnieuw of mail naar ${CONTACT_EMAIL}.`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Versturen';
+  }
 }
 
 function showFileInfo(filename, meta) {

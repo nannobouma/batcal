@@ -6,7 +6,7 @@
   <title>Thuisbatterij ROI Calculator</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=13">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 
@@ -19,12 +19,20 @@
     <h1>Thuisbatterij ROI Calculator</h1>
     <span>Bereken het rendement van uw energieopslag op basis van slimme-meterdata — Nanno Bouma · nannobouma@gmail.com</span>
   </div>
+  <div class="header-actions">
+  <button id="btn-about" class="btn btn-header" type="button">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    Uitleg &amp; verantwoording
+  </button>
   <button id="btn-contact" class="btn btn-header" type="button">
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
     </svg>
     Vraag stellen
   </button>
+  </div>
 </header>
 
 <div class="container">
@@ -480,6 +488,135 @@
 </div><!-- /container -->
 
 <!-- Scripts laden in volgorde: utilities eerst, app.js als laatste -->
+<!-- ══ UITLEG & VERANTWOORDING ════════════════════════════════════════════ -->
+<dialog id="about-dialog" class="modal modal-wide">
+  <div class="modal-head">
+    <h2>Uitleg &amp; verantwoording</h2>
+    <button type="button" class="modal-x" data-close-about aria-label="Sluiten">✕</button>
+  </div>
+
+  <div class="about-body">
+    <div class="about-disclaimer">
+      <strong>Let op.</strong> Deze calculator is met aandacht gemaakt, maar is nog maar met een zeer beperkte
+      hoeveelheid data getest: de slimme-meterdata van enkele huishoudens. De uitkomsten zijn een indicatie en
+      geen advies of garantie; er kunnen geen rechten aan worden ontleend. Reken een aankoopbeslissing altijd na
+      met uw eigen cijfers en de offerte van uw leverancier. Ziet u iets wat niet klopt? Laat het weten via
+      <em>Vraag stellen</em>.
+    </div>
+
+    <h3>Wat doet deze calculator?</h3>
+    <p>
+      De calculator rekent met de kwartierdata van uw slimme meter door wat een thuisbatterij in uw situatie had
+      gedaan. Per kwartier is bekend hoeveel stroom u uit het net afnam en hoeveel u teruglevert. Op die historische
+      gegevens wordt een batterij "nagespeeld". Er zijn twee berekeningen:
+    </p>
+    <ul>
+      <li><strong>Optie 1 — Rendement:</strong> wat levert de batterij in euro's op en hoe lang duurt het
+        terugverdienen?</li>
+      <li><strong>Optie 2 — Piekverlaging:</strong> hoe ver kan de batterij uw netafname in de winterse avondpiek
+        terugbrengen, en wat kost of levert dat op?</li>
+    </ul>
+
+    <h3>Uw data</h3>
+    <ul>
+      <li>Uw bestand wordt alleen in uw eigen browser ingelezen en verwerkt. Het wordt niet naar een server
+        gestuurd en niet bewaard.</li>
+      <li>De slimme meter ziet alleen wat het net in en uit gaat. Zonnestroom die u direct zelf verbruikt staat
+        niet in de data. Daarom kunt u bij optie 1 de totale opbrengst van uw zonnepanelen invullen; dan worden
+        zelfverbruik en teruglevering ook als percentage van de opwek getoond.</li>
+      <li>De voorbeelddata is van één huishouden met zonnepanelen en zonder batterij, over heel 2025.</li>
+      <li>Bij dynamische tarieven worden historische EPEX-dag-vooruitprijzen opgehaald bij energyzero.nl
+        (met energy-charts.info als reserve). Daarbij worden alleen de gevraagde datums verstuurd, niet uw
+        verbruik.</li>
+    </ul>
+
+    <h3>Optie 1 — Rendement berekenen</h3>
+    <p>De batterij begint leeg en wordt kwartier voor kwartier door de hele periode gevolgd.</p>
+    <ul>
+      <li><strong>Vast tarief.</strong> Elk kwartier waarin u teruglevert, gaat dat overschot eerst de batterij in
+        tot die vol is. Elk kwartier waarin u stroom afneemt, levert de batterij zoveel mogelijk daarvan. De
+        batterij laadt nooit uit het net en levert nooit aan het net.</li>
+      <li><strong>Dynamisch tarief.</strong> Zonne-overschot wordt ook hier altijd opgeslagen. Daarnaast wordt per
+        dag vooruitgekeken naar de prijzen: de batterij laadt in de goedkoopste kwartieren zonder zon uit het net,
+        maar alleen als dat na aftrek van de opslagkosten en het rendementsverlies nog iets oplevert, en alleen in
+        de ruimte die het verwachte zonne-overschot overlaat. Ontladen gebeurt bij voorkeur in het duurste kwart
+        van de dag; daarbuiten alleen als de batterij meer dan half vol is.</li>
+      <li><strong>Rendementsverlies.</strong> De roundtrip-efficiëntie wordt gelijk verdeeld over laden en
+        ontladen. Bij 85% gaat van elke kWh die u opslaat ongeveer 0,15 kWh verloren.</li>
+      <li><strong>Vermogen.</strong> De batterij kan in één uur volledig laden of ontladen (bij 5 kWh dus 5 kW).</li>
+      <li><strong>Kosten.</strong> Voor elk kwartier worden de kosten zonder en met batterij berekend:
+        afname × prijs − teruglevering × terugleverprijs. Bij een dynamisch tarief is de afnameprijs de EPEX-prijs
+        plus de ingevulde opslag (belasting, netkosten en marge). Het verschil is de besparing.</li>
+      <li><strong>Terugverdientijd en ROI.</strong> De besparing wordt omgerekend naar een heel jaar
+        (× 365 / aantal dagen in uw data). Terugverdientijd = investering / jaarbesparing.
+        ROI = (jaarbesparing × levensduur − investering) / investering.</li>
+      <li><strong>Zelfverbruik in kWh.</strong> De tabel laat zien hoeveel zonnestroom via de batterij alsnog zelf
+        wordt gebruikt, hoeveel teruglevering overblijft en hoeveel kWh in de batterij verloren gaat.</li>
+    </ul>
+    <p class="about-sub">Waar deze berekening geen rekening mee houdt:</p>
+    <ul>
+      <li>veroudering van de batterij (capaciteit neemt in de praktijk af) en het eigen stand-by-verbruik;</li>
+      <li>veranderende tarieven, belastingen, terugleverkosten en de regels rond salderen in de komende jaren;</li>
+      <li>rente, onderhoud, subsidie en restwaarde;</li>
+      <li>een jaar dat anders verloopt dan het jaar in uw data (weer, verbruik, een warmtepomp of elektrische auto
+        erbij);</li>
+      <li>bij dynamisch tarief: de planning kent de prijzen én uw verbruik van de hele dag vooraf. Een echte
+        batterij moet dat voorspellen en haalt dus iets minder.</li>
+    </ul>
+
+    <h3>Optie 2 — Piekverlaging berekenen</h3>
+    <p>
+      In de wintermaanden is het stroomnet het zwaarst belast aan het begin van de avond. Deze berekening kijkt
+      alleen naar november t/m februari en naar het piekvenster (standaard 16:00–21:00 uur). De belangrijkste maat
+      is het <strong>piekaandeel</strong>: uw netafname in het piekvenster als percentage van uw netafname over de
+      hele dag. Het wordt per dag, per maand en over de hele periode berekend (totaal piekafname gedeeld door
+      totaal dagafname) en vergeleken met de streefwaarde.
+    </p>
+    <ul>
+      <li><strong>Laden vóór de piek.</strong> Na het piekvenster wordt de batterij weer gevuld voor de volgende
+        dag: eerst met zonne-overschot, en wat dan nog ontbreekt 's nachts uit het net (standaard 0:00–6:00 uur),
+        gespreid over de kwartieren waarin u zelf het minst afneemt.</li>
+      <li><strong>Ontladen in de piek.</strong> In het piekvenster dekt de batterij uw afname zo dat wat u nog uit
+        het net haalt zo laag en zo vlak mogelijk is. Eerst worden de hoogste kwartieren afgetopt. Is de batterij
+        groot genoeg, dan wordt de afname in de piek nul.</li>
+      <li><strong>Grenzen.</strong> De batterij levert nooit aan het net, kan niet meer leveren dan het ingevulde
+        vermogen en verliest energie volgens de roundtrip-efficiëntie. Het extra nachtladen telt mee in uw
+        dagafname.</li>
+      <li><strong>Zonder batterij.</strong> Vul 0 kWh in om uw werkelijke piekaandeel te zien. De kolom
+        "zonder batterij" staat altijd in de resultaten.</li>
+      <li><strong>Batterijgrootte.</strong> Dezelfde berekening wordt herhaald voor een reeks capaciteiten, zodat u
+        ziet hoeveel een grotere of kleinere batterij uitmaakt.</li>
+      <li><strong>Kosten en opbrengsten.</strong> Bij een dynamisch tarief: de afname die u in de piek vermijdt
+        (tegen EPEX-prijs plus opslag), min de kosten van het nachtladen (ook EPEX plus opslag), min de
+        teruglevering die u misloopt doordat zonnestroom de batterij in gaat (tegen de kale EPEX-prijs).</li>
+    </ul>
+    <p class="about-sub">Waar deze berekening geen rekening mee houdt:</p>
+    <ul>
+      <li>de berekening kent uw verbruik van de hele dag vooraf en begint elke aaneengesloten periode met een volle
+        batterij. De uitkomst is daarmee het maximaal haalbare; een echte batterij haalt minder;</li>
+      <li>de batterij wordt in deze berekening alleen voor de piek ingezet, niet tegelijk voor zelfverbruik of
+        handel op prijs in de rest van de dag;</li>
+      <li>dagen met te weinig meetgegevens worden overgeslagen;</li>
+      <li>een eventuele vergoeding voor het vermijden van de piek of toekomstige tijdsafhankelijke nettarieven
+        zijn niet meegerekend.</li>
+    </ul>
+
+    <h3>Verantwoording</h3>
+    <p>
+      Deze calculator is een persoonlijk project van Nanno Bouma en is gemaakt met hulp van AI (Claude). De
+      berekening van de piekverlaging is geïnspireerd op het project <em>Vermijd de piek</em> van Energie van
+      Utrecht en EnergieID, maar staat daar los van. De broncode is open en staat op GitHub
+      (nannobouma/batcal). De rekenmodellen zijn gecontroleerd op de voorbeelddata, onder meer door dagen met de
+      hand na te rekenen en de energiebalans te controleren, maar niet op een brede set van huishoudens,
+      meterformaten of jaren.
+    </p>
+  </div>
+
+  <div class="modal-actions">
+    <button type="button" class="btn btn-primary" data-close-about>Sluiten</button>
+  </div>
+</dialog>
+
 <!-- ══ CONTACTFORMULIER ═══════════════════════════════════════════════════ -->
 <dialog id="contact-dialog" class="modal">
   <form id="contact-form" novalidate>
@@ -497,6 +634,7 @@
       <label for="ct-message">Uw vraag</label>
       <textarea id="ct-message" rows="6" required></textarea>
     </div>
+    <input type="text" id="ct-honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
     <div id="alert-contact" class="alert"></div>
     <div class="modal-actions">
       <button type="button" id="ct-cancel" class="btn btn-secondary">Sluiten</button>
@@ -505,12 +643,12 @@
   </form>
 </dialog>
 
-<script src="js/csv-parser.js?v=13"></script>
-<script src="js/battery-sim.js?v=13"></script>
-<script src="js/peak-sim.js?v=13"></script>
-<script src="js/pricing.js?v=13"></script>
-<script src="js/charts.js?v=13"></script>
-<script src="js/app.js?v=13"></script>
+<script src="js/csv-parser.js?v=15"></script>
+<script src="js/battery-sim.js?v=15"></script>
+<script src="js/peak-sim.js?v=15"></script>
+<script src="js/pricing.js?v=15"></script>
+<script src="js/charts.js?v=15"></script>
+<script src="js/app.js?v=15"></script>
 
 </body>
 </html>
