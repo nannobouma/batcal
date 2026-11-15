@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initWeekNav();
   $('btn-calc').addEventListener('click', runCalculation);
   $('btn-peak').addEventListener('click', runPeakCalculation);
+  $('btn-sample').addEventListener('click', loadSampleData);
+  initContact();
   updateCalcButton();
 });
 
@@ -48,22 +50,88 @@ function handleFile(file) {
   }
 
   const reader = new FileReader();
-  reader.onload = e => {
-    const text   = e.target.result;
-    const result = parseSmartMeterCSV(text);
+  reader.onload = e => loadCsvText(e.target.result, file.name);
+  reader.readAsText(file, 'UTF-8');
+}
 
-    if (result.error) {
-      showAlert('alert-parse', result.error, 'error');
+/** Verwerkt CSV-tekst (eigen bestand of voorbeelddata). Geeft true bij succes. */
+function loadCsvText(text, name) {
+  const result = parseSmartMeterCSV(text);
+
+  if (result.error) {
+    showAlert('alert-parse', result.error, 'error');
+    return false;
+  }
+
+  _parsedData   = result.data;
+  _parsedFormat = result.meta.format;
+  showFileInfo(name, result.meta);
+  hideAlert('alert-parse');
+  updateCalcButton();
+  return true;
+}
+
+// ── Voorbeelddata ────────────────────────────────────────────────────────────
+const SAMPLE_DATA = {
+  url:      'data/voorbeeld-kwartierdata-2025.csv',
+  name:     'Voorbeelddata 2025',
+  solarKwh: 2600,   // opwek zonnepanelen in het voorbeeldjaar
+};
+
+async function loadSampleData() {
+  const btn = $('btn-sample');
+  btn.disabled = true;
+  btn.textContent = 'Voorbeelddata laden…';
+  try {
+    const resp = await fetch(SAMPLE_DATA.url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (loadCsvText(await resp.text(), SAMPLE_DATA.name)) {
+      $('p-solar').value = SAMPLE_DATA.solarKwh;
+    }
+  } catch (err) {
+    showAlert('alert-parse', 'De voorbeelddata kon niet worden geladen. Probeer het later opnieuw.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Gebruik voorbeelddata';
+  }
+}
+
+// ── Contactformulier ─────────────────────────────────────────────────────────
+const CONTACT_EMAIL = 'nannobouma@gmail.com';
+
+function initContact() {
+  const dialog = $('contact-dialog');
+  $('btn-contact').addEventListener('click', () => { hideAlert('alert-contact'); dialog.showModal(); });
+  $('ct-cancel').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+
+  $('contact-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name    = $('ct-name').value.trim();
+    const email   = $('ct-email').value.trim();
+    const message = $('ct-message').value.trim();
+
+    if (!$('ct-email').checkValidity() || !email) {
+      showAlert('alert-contact', 'Vul een geldig e-mailadres in, zodat u antwoord kunt krijgen.', 'error');
       return;
     }
+    if (!message) {
+      showAlert('alert-contact', 'Vul uw vraag in.', 'error');
+      return;
+    }
+    sendContact({ name, email, message });
+  });
+}
 
-    _parsedData   = result.data;
-    _parsedFormat = result.meta.format;
-    showFileInfo(file.name, result.meta);
-    hideAlert('alert-parse');
-    updateCalcButton();
-  };
-  reader.readAsText(file, 'UTF-8');
+/** Verstuurt de vraag via het mailprogramma van de bezoeker. */
+function sendContact({ name, email, message }) {
+  const subject = 'Vraag over de Thuisbatterij ROI Calculator';
+  const body    = `${message}\n\n— ${name || 'Naam niet ingevuld'}\n${email}`;
+  window.location.href =
+    `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  showAlert('alert-contact',
+    'Uw mailprogramma wordt geopend met de vraag ingevuld. Verstuur de e-mail daar om de vraag te versturen.',
+    'success');
 }
 
 function showFileInfo(filename, meta) {

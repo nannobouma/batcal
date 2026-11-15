@@ -375,6 +375,79 @@ header span { opacity: .7; font-size: .875rem; }
 .tabs { flex-wrap: wrap; }
 .tab-btn { white-space: nowrap; }
 
+/* ── Header-knop, secundaire knop ── */
+.btn-header {
+  margin-left: auto;
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.35);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+header > svg { flex-shrink: 0; }
+.btn-header:hover { background: rgba(255,255,255,.24); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
+}
+.btn-secondary:hover { background: var(--primary-light); }
+.btn-secondary:disabled { color: var(--text-3); border-color: var(--border); cursor: not-allowed; }
+@media (max-width: 600px) {
+  header { flex-wrap: wrap; }
+  .btn-header { margin-left: 40px; }
+}
+
+/* ── Voorbeelddata ── */
+.sample-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: .875rem;
+  color: var(--text-2);
+}
+.sample-hint { font-size: .8125rem; color: var(--text-3); margin-top: 6px; }
+
+/* ── Contactformulier (dialog) ── */
+.modal {
+  border: none;
+  border-radius: var(--radius);
+  padding: 24px;
+  width: min(480px, calc(100vw - 32px));
+  margin: auto;
+  color: var(--text);
+  box-shadow: 0 10px 40px rgba(0,0,0,.25);
+}
+.modal::backdrop { background: rgba(15,23,42,.5); }
+.modal h2 { font-size: 1.125rem; margin-bottom: 6px; }
+.modal-intro { font-size: .875rem; color: var(--text-2); margin-bottom: 16px; }
+.form-field { margin-bottom: 14px; }
+.form-field label {
+  display: block;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.form-field input, .form-field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  resize: vertical;
+}
+.form-field input:focus, .form-field textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(30,64,175,.1);
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
 /* ── Format detection badge ── */
 .format-badge {
   display: inline-flex;
