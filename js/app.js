@@ -393,7 +393,7 @@ function getPeakParams() {
     capacity:        Math.max(0, numOr('pk-capacity', 5)),
     efficiency:      Math.min(1, Math.max(0.5, numOr('pk-efficiency', 85) / 100)),
     surcharge:       Math.max(0, numOr('pk-surcharge', 0.12)),
-    maxPowerKw:      Math.max(0, numOr('pk-power', 3)),
+    maxPowerKw:      Math.max(0, numOr('pk-power', 3000)) / 1000,   // invoer in watt
     peakStartHour,
     peakEndHour,
     targetPct:       numOr('pk-target', 36),
@@ -503,7 +503,7 @@ function renderPeakResults(result, sweep) {
   $('pk-note').textContent =
     `${t.days} dagen (${fmtDate(days[0].date)} – ${fmtDate(days[days.length - 1].date)}), ` +
     `piekvenster ${params.peakStartHour}:00–${params.peakEndHour}:00, ` +
-    `batterij ${params.capacity} kWh / ${params.maxPowerKw} kW` +
+    `batterij ${params.capacity} kWh / ${Math.round(params.maxPowerKw * 1000)} W` +
     (skippedDays ? ` · ${skippedDays} onvolledige dag(en) overgeslagen` : '') + '.';
 
   const cls = v => v <= params.targetPct ? 'under-target' : 'over-target';
